@@ -1,5 +1,5 @@
 project(arcus)
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.6)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -21,25 +21,33 @@ find_package(Protobuf 3.0.0 REQUIRED)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) #Required if a patch to libArcus needs to be made via templates.
 
 if(BUILD_PYTHON)
-    set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+
+    # FIXME: Remove the code for CMake <3.12 once we have switched over completely.
+    # FindPython3 is a new module since CMake 3.12. It deprecates FindPythonInterp and FindPythonLibs. The FindPython3
+    # module is copied from the CMake repository here so in CMake <3.12 we can still use it.
+    if(${CMAKE_VERSION} VERSION_LESS 3.12)
+        # Use FindPythonInterp and FindPythonLibs for CMake <3.12
+        find_package(PythonInterp 3.5 REQUIRED)
+        find_package(PythonLibs 3.5 REQUIRED)
+    elseif()
+        # Use FindPython3 for CMake >=3.12
+        find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+    endif()
+
     find_package(SIP REQUIRED)
     if(NOT DEFINED LIB_SUFFIX)
         set(LIB_SUFFIX "")
     endif()
-    if(EXISTS /etc/debian_version)
-        # Running on a debian-based system, which requires special handling for python modules.
-        set(PYTHON_SITE_PACKAGES_DIR lib${LIB_SUFFIX}/python3/dist-packages CACHE STRING "Directory to install Python bindings to")
+
+    if(${CMAKE_VERSION} VERSION_LESS 3.12)
+        include_directories(python/ src/ ${SIP_INCLUDE_DIR} ${PYTHON_INCLUDE_DIR})
     else()
-        set(PYTHON_SITE_PACKAGES_DIR lib${LIB_SUFFIX}/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/site-packages CACHE STRING "Directory to install Python bindings to")
+        include_directories(python/ src/ ${SIP_INCLUDE_DIRS} ${Python3_INCLUDE_DIRS})
     endif()
-    include_directories(python/ src/ ${SIP_INCLUDE_DIR} ${PYTHON_INCLUDE_DIR})
 endif()
 
-if(NOT ${CMAKE_VERSION} VERSION_LESS 3.1)
-    set(CMAKE_CXX_STANDARD 11)
-else()
-    set(CMAKE_CXX_FLAGS "-std=c++11")
-endif()
+set(CMAKE_CXX_STANDARD 11)
 
 if(APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
